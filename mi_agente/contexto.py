@@ -6,7 +6,8 @@ defecto (el resultado completo de la tool o todo el historial) y el agente sigue
 
 Comprueba tu código: uv run pytest tests/test_mi_agente.py --runxfail -q
 """
-
+import re
+import json
 
 def format_tool_result(name, result):
     """✏️ PASO 3 · Lo que devuelve una tool también es contexto.
@@ -25,8 +26,39 @@ def format_tool_result(name, result):
         [{"product_id": "P001", "name": "Auriculares Nube", "category": "audio",
           "price_cents": 6990, "description": "auriculares inalámbricos ...", "returnable": 1}]
     """
+    import json
     ### TU CÓDIGO AQUÍ (S2 · Paso 3)
-    raise NotImplementedError
+    if isinstance(result, dict) and "error" in result:
+        return json.dumps(result, ensure_ascii=False)
+    if name == "search_products":
+        products = [
+            {
+                "product_id": p["product_id"],
+                "name": p["name"],
+                "precio": f"{p['price_cents'] / 100:.2f}".replace(".", ",") + " €",
+                "description": p["description"],
+            }
+            for p in result
+        ]
+        return json.dumps(products, ensure_ascii=False)
+    if name == "search_policies":
+        documents = [{"source_id": d["source_id"], "text": d["text"]} for d in result[:2]]
+        return json.dumps(documents, ensure_ascii=False)
+    return json.dumps(result, ensure_ascii=False)
+
+            
+            
+
+
+    
+
+
+
+
+
+
+
+
 
 
 def update_state(state, user_message):
@@ -44,7 +76,16 @@ def update_state(state, user_message):
     Pista: el módulo `re` de Python. r"(\\d+(?:[.,]\\d+)?)\\s*(?:€|euros)" encuentra "80 €".
     """
     ### TU CÓDIGO AQUÍ (S2 · Paso 4a)
-    raise NotImplementedError
+    import json
+    import re
+    new = dict(state)
+    amount = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:€|euros)", user_message)
+    if amount:
+        new["presupuesto_eur"] = float(amount.group(1).replace(",", "."))
+    name = re.search(r"(?:me llamo|soy)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)", user_message)
+    if name:
+        new["nombre"] = name.group(1)
+    return new
 
 
 def build_history(turns, state, max_turns=2):
@@ -61,4 +102,12 @@ def build_history(turns, state, max_turns=2):
       "assistant" por turno. Sin los resultados de las tools.
     """
     ### TU CÓDIGO AQUÍ (S2 · Paso 4b)
-    raise NotImplementedError
+   
+    messages = []
+    if state:
+        summary = "; ".join(f"{k}={v}" for k, v in state.items())
+        messages.append({"role": "system", "content": f"Estado de la conversación: {summary}"})
+    for turn in turns[-max_turns:]:
+        messages.append({"role": "user", "content": turn["user"]})
+        messages.append({"role": "assistant", "content": turn["assistant"]})
+    return messages
